@@ -12,3 +12,6 @@ venv/
 Thumbs.db
 .vscode/
 .idea/
+
+# Stray nested clone GitHub Desktop created - never track it
+/InterviewCoach/
