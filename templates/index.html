@@ -1,0 +1,129 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Interview Coach</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+  <header>
+    <h1>Interview Coach</h1>
+    <p class="tagline">Practise competency-based answers out loud &mdash; get STAR-method feedback</p>
+  </header>
+
+  <main>
+    <!-- STEP 1: Setup -->
+    <section id="step-setup" class="step">
+      <h2>1 &middot; Set up your practice session</h2>
+      <form id="setup-form">
+        <label for="cv">Your CV <span class="hint">(optional &mdash; PDF, Word .docx or .txt; with a CV, questions are tailored to your experience and feedback flags experience you forgot to mention)</span></label>
+        <input type="file" id="cv" name="cv" accept=".pdf,.docx,.txt">
+
+        <label for="job-spec">Job spec for the role you're applying for</label>
+        <textarea id="job-spec" name="job_spec" rows="10" required
+          placeholder="Paste the full job description / person specification here..."></textarea>
+
+        <div class="form-row">
+          <div>
+            <label for="num-questions">Questions</label>
+            <select id="num-questions" name="num_questions">
+              <option>3</option><option>4</option><option>5</option>
+              <option selected>6</option><option>7</option><option>8</option>
+            </select>
+          </div>
+          <div>
+            <label for="speech-lang">Speech language</label>
+            <select id="speech-lang">
+              <option value="en-GB" selected>English (UK)</option>
+              <option value="en-IE">English (Ireland)</option>
+              <option value="en-US">English (US)</option>
+              <option value="en-AU">English (Australia)</option>
+            </select>
+          </div>
+        </div>
+
+        <button type="submit" id="start-btn" class="primary">Generate my questions</button>
+      </form>
+      <div id="setup-status" class="status hidden"></div>
+    </section>
+
+    <!-- STEP 2: Question + recording -->
+    <section id="step-interview" class="step hidden">
+      <div class="progress" id="progress"></div>
+      <div class="question-card">
+        <span class="competency-chip" id="competency"></span>
+        <h2 id="question-text"></h2>
+        <p class="why-asked" id="why-asked"></p>
+      </div>
+
+      <div class="recorder">
+        <button id="record-btn" class="record">&#9679; Record answer</button>
+        <button id="clear-answer" class="secondary hidden">Start over</button>
+        <span id="record-status"></span>
+      </div>
+      <p id="no-speech-note" class="hint hidden">
+        Speech recognition isn't supported in this browser (use Chrome or Edge) &mdash; you can type your answer below instead.
+      </p>
+
+      <div id="transcript-wrap">
+        <label for="transcript">Your answer</label>
+        <textarea id="transcript" rows="10" placeholder="Type your answer here..."></textarea>
+      </div>
+
+      <div class="actions">
+        <button id="submit-answer" class="primary">Submit for feedback</button>
+        <button id="skip-question" class="secondary">Skip this question</button>
+      </div>
+      <div id="score-status" class="status hidden"></div>
+    </section>
+
+    <!-- STEP 3: Feedback -->
+    <section id="step-feedback" class="step hidden">
+      <h2>Feedback</h2>
+      <div class="score-row">
+        <div class="big-score"><span id="overall-score"></span><small>/100</small></div>
+        <div class="depth-score">Depth of detail: <strong id="depth-score"></strong>/10</div>
+      </div>
+
+      <div class="star-grid" id="star-grid"></div>
+
+      <h3>Your answer, colour-coded</h3>
+      <div class="legend">
+        <span class="seg-strong">answered well</span>
+        <span class="seg-expand">should be expanded</span>
+        <span class="seg-unclear">could be clearer</span>
+      </div>
+      <div class="coded-answer" id="coded-answer"></div>
+      <ol class="seg-notes" id="seg-notes"></ol>
+
+      <div class="feedback-cols">
+        <div>
+          <h3>What you missed</h3>
+          <ul id="missed-points"></ul>
+        </div>
+        <div>
+          <h3>How to improve</h3>
+          <ul id="suggestions"></ul>
+        </div>
+      </div>
+
+      <p class="summary" id="feedback-summary"></p>
+      <button id="next-question" class="primary"></button>
+    </section>
+
+    <!-- STEP 4: Session summary -->
+    <section id="step-summary" class="step hidden">
+      <h2>Session complete</h2>
+      <p class="big-score centre"><span id="avg-score"></span><small>/100 average</small></p>
+      <ul id="results-list" class="results-list"></ul>
+      <div class="actions">
+        <button id="download-report" class="primary">Download report</button>
+        <button id="restart" class="secondary">Start a new session</button>
+      </div>
+    </section>
+  </main>
+
+  <script src="{{ url_for('static', filename='app.js') }}"></script>
+</body>
+</html>
