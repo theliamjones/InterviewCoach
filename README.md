@@ -2,8 +2,13 @@
 
 Practise competency-based interview answers **out loud** and get STAR-method feedback from Claude.
 
-Works for anyone: upload a CV and paste a job spec, and the questions are tailored to that
-candidate and that role.
+Built for anyone going through the recruitment process: paste in a job spec (and optionally your
+CV), answer the questions by speaking, and get scored on how well-structured and detailed your
+answers are.
+
+> **You'll need your own Anthropic (Claude) API key** — it's free to create and pay-as-you-go, and
+> a practice session costs only a few pence. Get one at <https://console.anthropic.com>. The
+> author's key is **not** included (and isn't in this repo).
 
 ## How it works
 
@@ -21,24 +26,35 @@ candidate and that role.
 4. **Report** — download the whole session as a standalone HTML file, with your transcribed
    answers and all feedback, to review and work on.
 
+## Requirements
+
+- [Python 3.10+](https://www.python.org/downloads/)
+- An Anthropic API key (see above)
+- **Chrome or Edge** to use it (the voice transcription uses the browser's built-in Web Speech
+  API, which Firefox doesn't support — there you can type answers instead)
+
 ## Setup
 
 ```powershell
-cd C:\Liam\Projects\InterviewCoach
+git clone https://github.com/theliamjones/InterviewCoach.git
+cd InterviewCoach
 py -m pip install -r requirements.txt
 copy .env.example .env
-# edit .env and add your ANTHROPIC_API_KEY
+# then open .env and paste in your ANTHROPIC_API_KEY
 ```
 
+(On macOS/Linux, use `python3` instead of `py` and `cp` instead of `copy`.)
+
 ## Run
+
+On Windows, just **double-click `start.bat`** — it launches the app and opens your browser
+automatically. Or from a terminal:
 
 ```powershell
 py app.py
 ```
 
-Then open http://localhost:5050 in **Chrome or Edge** (speech recognition uses the browser's
-Web Speech API, which isn't available in Firefox — in unsupported browsers you can type
-answers instead).
+Then open <http://localhost:5050> in Chrome or Edge.
 
 ## Notes
 
