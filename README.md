@@ -45,6 +45,10 @@ copy .env.example .env
 
 (On macOS/Linux, use `python3` instead of `py` and `cp` instead of `copy`.)
 
+> **No `.env`? No problem.** If a key isn't found when you start the app, it'll ask you to
+> paste one in the browser. That key is kept in memory for that run only — never written to
+> disk — so it's handy for a quick try without editing files.
+
 ## Run
 
 On Windows, just **double-click `start.bat`** — it launches the app and opens your browser

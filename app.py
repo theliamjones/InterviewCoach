@@ -29,6 +29,27 @@ def index():
     return render_template("index.html")
 
 
+@app.get("/api/key-status")
+def key_status():
+    """Tell the front end whether a usable API key is already configured."""
+    return jsonify(has_key=coach.has_key())
+
+
+@app.post("/api/key")
+def set_key():
+    """Accept an API key entered in the browser; validate and hold it in memory."""
+    data = request.get_json(silent=True) or {}
+    try:
+        coach.set_runtime_key(data.get("key", ""))
+    except ValueError as e:
+        return jsonify(error=str(e)), 400
+    except anthropic.AuthenticationError:
+        return jsonify(error="That key was rejected by Anthropic - check it and try again."), 400
+    except anthropic.APIError as e:
+        return jsonify(error=f"Couldn't validate the key: {e.message}"), 502
+    return jsonify(ok=True)
+
+
 @app.post("/api/start")
 def start_session():
     cv_file = request.files.get("cv")
@@ -38,6 +59,8 @@ def start_session():
     except ValueError:
         num_questions = 6
 
+    if not coach.has_key():
+        return jsonify(error="No API key set - please enter your Claude API key.", needs_key=True), 401
     if len(job_spec) < 50:
         return jsonify(error="Please paste the job spec (at least a few sentences)."), 400
 
@@ -53,7 +76,7 @@ def start_session():
     try:
         question_set = coach.generate_questions(cv_block, job_spec, num_questions)
     except anthropic.AuthenticationError:
-        return jsonify(error="Invalid ANTHROPIC_API_KEY - check your .env file."), 502
+        return jsonify(error="Your API key was rejected - please re-enter it.", needs_key=True), 401
     except anthropic.APIError as e:
         return jsonify(error=f"Claude API error: {e.message}"), 502
 
@@ -82,10 +105,15 @@ def score_answer():
     if len(transcript) < 20:
         return jsonify(error="The answer is too short to score - try recording again."), 400
 
+    if not coach.has_key():
+        return jsonify(error="No API key set - please enter your Claude API key.", needs_key=True), 401
+
     try:
         feedback = coach.score_answer(
             session["cv_block"], session["job_spec"], question, transcript
         )
+    except anthropic.AuthenticationError:
+        return jsonify(error="Your API key was rejected - please re-enter it.", needs_key=True), 401
     except anthropic.APIError as e:
         return jsonify(error=f"Claude API error: {e.message}"), 502
 

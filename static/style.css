@@ -77,6 +77,20 @@ button.primary:disabled { background: #9bb5ad; cursor: wait; }
 button.secondary { background: transparent; border-color: var(--border); color: var(--muted); }
 button.secondary:hover { border-color: var(--muted); }
 
+/* API key gate */
+.key-panel h2 { margin-top: 0; }
+.key-row { display: flex; gap: 0.6rem; align-items: stretch; }
+.key-row input {
+  flex: 1;
+  padding: 0.55rem 0.7rem;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  font-family: inherit;
+  font-size: 0.95rem;
+  background: #fcfbf8;
+}
+.key-row button { margin-top: 0; white-space: nowrap; }
+
 .status { margin-top: 1rem; padding: 0.7rem 1rem; border-radius: 6px; font-size: 0.95rem; }
 .status.working { background: #eef3f0; color: var(--accent-dark); }
 .status.working::before { content: "⏳ "; }

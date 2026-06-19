@@ -15,6 +15,22 @@
   <main>
     <!-- STEP 1: Setup -->
     <section id="step-setup" class="step">
+      <!-- Key gate: shown only when no usable API key is configured -->
+      <div id="key-panel" class="key-panel hidden">
+        <h2>&#128273; Enter your Claude API key</h2>
+        <p>No API key was found, so you'll need to provide one to use the app. It's kept
+           <strong>only in memory for this session</strong> &mdash; never saved to disk or shared.</p>
+        <div class="key-row">
+          <input type="password" id="api-key" placeholder="sk-ant-..." autocomplete="off" spellcheck="false">
+          <button id="save-key" class="primary">Use this key</button>
+        </div>
+        <p class="hint">Don't have one? Create a key at
+          <a href="https://console.anthropic.com" target="_blank" rel="noopener">console.anthropic.com</a>
+          &mdash; it's pay-as-you-go and a practice session costs only a few pence.</p>
+        <div id="key-status" class="status hidden"></div>
+      </div>
+
+      <div id="setup-main" class="hidden">
       <h2>1 &middot; Set up your practice session</h2>
       <form id="setup-form">
         <label for="cv">Your CV <span class="hint">(optional &mdash; PDF, Word .docx or .txt; with a CV, questions are tailored to your experience and feedback flags experience you forgot to mention)</span></label>
@@ -46,6 +62,7 @@
         <button type="submit" id="start-btn" class="primary">Generate my questions</button>
       </form>
       <div id="setup-status" class="status hidden"></div>
+      </div><!-- /setup-main -->
     </section>
 
     <!-- STEP 2: Question + recording -->

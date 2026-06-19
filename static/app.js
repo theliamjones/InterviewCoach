@@ -118,6 +118,67 @@ $("clear-answer").addEventListener("click", () => {
 });
 
 // ---------------------------------------------------------------------------
+// API key gate
+// ---------------------------------------------------------------------------
+
+function showKeyPanel(message) {
+  $("key-panel").classList.remove("hidden");
+  $("setup-main").classList.add("hidden");
+  showStep("step-setup");
+  if (message) setStatus($("key-status"), message, "error");
+  $("api-key").focus();
+}
+
+function showSetupMain() {
+  $("key-panel").classList.add("hidden");
+  $("setup-main").classList.remove("hidden");
+}
+
+async function checkKey() {
+  try {
+    const res = await fetch("/api/key-status");
+    const data = await res.json();
+    data.has_key ? showSetupMain() : showKeyPanel("");
+  } catch {
+    // If the status check fails, fall back to showing setup; calls will prompt if needed.
+    showSetupMain();
+  }
+}
+
+async function saveKey() {
+  const key = $("api-key").value.trim();
+  if (!key) {
+    setStatus($("key-status"), "Please paste your API key.", "error");
+    return;
+  }
+  $("save-key").disabled = true;
+  setStatus($("key-status"), "Checking your key with Anthropic...", "working");
+  try {
+    const res = await fetch("/api/key", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ key }),
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || "Couldn't validate the key.");
+    $("api-key").value = "";
+    setStatus($("key-status"), "", "");
+    showSetupMain();
+  } catch (err) {
+    setStatus($("key-status"), err.message, "error");
+  } finally {
+    $("save-key").disabled = false;
+  }
+}
+
+$("save-key").addEventListener("click", saveKey);
+$("api-key").addEventListener("keydown", (e) => {
+  if (e.key === "Enter") { e.preventDefault(); saveKey(); }
+});
+
+checkKey();
+
+// ---------------------------------------------------------------------------
 // Step 1: setup
 // ---------------------------------------------------------------------------
 
@@ -131,7 +192,10 @@ $("setup-form").addEventListener("submit", async (e) => {
     const formData = new FormData($("setup-form"));
     const res = await fetch("/api/start", { method: "POST", body: formData });
     const data = await res.json();
-    if (!res.ok) throw new Error(data.error || "Something went wrong.");
+    if (!res.ok) {
+      if (data.needs_key) { showKeyPanel(data.error || "Please enter your API key."); return; }
+      throw new Error(data.error || "Something went wrong.");
+    }
 
     state.sessionId = data.session_id;
     state.questions = data.questions;
@@ -186,7 +250,10 @@ $("submit-answer").addEventListener("click", async () => {
       }),
     });
     const data = await res.json();
-    if (!res.ok) throw new Error(data.error || "Something went wrong.");
+    if (!res.ok) {
+      if (data.needs_key) { showKeyPanel(data.error || "Please re-enter your API key."); return; }
+      throw new Error(data.error || "Something went wrong.");
+    }
 
     state.results.push({ question: state.questions[state.current], transcript, feedback: data });
     renderFeedback(data);
