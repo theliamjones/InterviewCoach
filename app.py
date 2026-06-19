@@ -6,9 +6,11 @@ from datetime import date
 
 from dotenv import load_dotenv
 
-# override=True: .env is authoritative for this app (a stale/empty ANTHROPIC_API_KEY
-# in the Windows environment would otherwise silently win over .env)
-load_dotenv(override=True)  # must run before coach creates the Anthropic client
+# Load .env from THIS file's directory, not the current working directory, so the
+# key is found however the app is launched (start.bat, terminal, preview, etc.).
+# override=True: .env is authoritative (a stale/empty ANTHROPIC_API_KEY in the
+# Windows environment would otherwise silently win over .env).
+load_dotenv(os.path.join(os.path.dirname(__file__), ".env"), override=True)
 
 import anthropic
 from flask import Flask, Response, jsonify, render_template, request

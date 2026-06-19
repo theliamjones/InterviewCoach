@@ -91,6 +91,50 @@ button.secondary:hover { border-color: var(--muted); }
 }
 .key-row button { margin-top: 0; white-space: nowrap; }
 
+/* Processing overlay */
+.overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(25, 30, 28, 0.55);
+  backdrop-filter: blur(2px);
+  animation: overlay-fade 0.15s ease-out;
+}
+.overlay.hidden { display: none; }
+@keyframes overlay-fade { from { opacity: 0; } to { opacity: 1; } }
+
+.overlay-card {
+  background: var(--card);
+  border-radius: 12px;
+  padding: 2rem 2.6rem;
+  text-align: center;
+  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.25);
+  max-width: 90%;
+}
+.overlay-card p { margin: 0.3rem 0 0; }
+#overlay-message { font-size: 1.15rem; color: var(--ink); }
+.overlay-meta { font-size: 0.85rem; color: var(--muted); }
+#overlay-timer { font-variant-numeric: tabular-nums; font-weight: bold; color: var(--accent); }
+
+.spinner {
+  width: 48px;
+  height: 48px;
+  margin: 0 auto 1.1rem;
+  border: 5px solid var(--border);
+  border-top-color: var(--accent);
+  border-radius: 50%;
+  animation: spin 0.9s linear infinite;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+
+@media (prefers-reduced-motion: reduce) {
+  .spinner { animation-duration: 2s; }
+  .overlay { animation: none; }
+}
+
 .status { margin-top: 1rem; padding: 0.7rem 1rem; border-radius: 6px; font-size: 0.95rem; }
 .status.working { background: #eef3f0; color: var(--accent-dark); }
 .status.working::before { content: "⏳ "; }

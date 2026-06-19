@@ -28,6 +28,29 @@ function escapeHtml(text) {
 }
 
 // ---------------------------------------------------------------------------
+// Processing overlay (dims the screen + live elapsed timer)
+// ---------------------------------------------------------------------------
+
+let overlayTimer = null;
+
+function showOverlay(message) {
+  $("overlay-message").textContent = message;
+  $("overlay-timer").textContent = "0s";
+  $("overlay").classList.remove("hidden");
+  const start = Date.now();
+  clearInterval(overlayTimer);
+  overlayTimer = setInterval(() => {
+    $("overlay-timer").textContent = Math.floor((Date.now() - start) / 1000) + "s";
+  }, 250);
+}
+
+function hideOverlay() {
+  clearInterval(overlayTimer);
+  overlayTimer = null;
+  $("overlay").classList.add("hidden");
+}
+
+// ---------------------------------------------------------------------------
 // Speech recognition (Web Speech API - Chrome/Edge)
 // ---------------------------------------------------------------------------
 
@@ -186,7 +209,8 @@ $("setup-form").addEventListener("submit", async (e) => {
   e.preventDefault();
   const btn = $("start-btn");
   btn.disabled = true;
-  setStatus($("setup-status"), "Reading your CV and job spec, drafting tailored questions... this can take a minute.", "working");
+  setStatus($("setup-status"), "", "");
+  showOverlay("Reading your job spec and drafting tailored questions…");
 
   try {
     const formData = new FormData($("setup-form"));
@@ -201,11 +225,11 @@ $("setup-form").addEventListener("submit", async (e) => {
     state.questions = data.questions;
     state.current = 0;
     state.results = [];
-    setStatus($("setup-status"), "", "");
     showQuestion();
   } catch (err) {
     setStatus($("setup-status"), err.message, "error");
   } finally {
+    hideOverlay();
     btn.disabled = false;
   }
 });
@@ -237,7 +261,8 @@ $("submit-answer").addEventListener("click", async () => {
   }
 
   $("submit-answer").disabled = true;
-  setStatus($("score-status"), "Scoring your answer against the STAR method... this can take a minute.", "working");
+  setStatus($("score-status"), "", "");
+  showOverlay("Scoring your answer against the STAR method…");
 
   try {
     const res = await fetch("/api/score", {
@@ -260,6 +285,7 @@ $("submit-answer").addEventListener("click", async () => {
   } catch (err) {
     setStatus($("score-status"), err.message, "error");
   } finally {
+    hideOverlay();
     $("submit-answer").disabled = false;
   }
 });
