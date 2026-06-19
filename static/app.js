@@ -33,8 +33,9 @@ function escapeHtml(text) {
 
 let overlayTimer = null;
 
-function showOverlay(message) {
+function showOverlay(message, hint) {
   $("overlay-message").textContent = message;
+  $("overlay-hint").textContent = hint || "this usually takes 10–30 seconds";
   $("overlay-timer").textContent = "0s";
   $("overlay").classList.remove("hidden");
   const start = Date.now();
@@ -42,6 +43,22 @@ function showOverlay(message) {
   overlayTimer = setInterval(() => {
     $("overlay-timer").textContent = Math.floor((Date.now() - start) / 1000) + "s";
   }, 250);
+}
+
+// POST JSON with a hard client-side timeout so a hung server can't spin forever.
+async function postJSON(url, body, timeoutMs = 60000) {
+  const ctrl = new AbortController();
+  const t = setTimeout(() => ctrl.abort(), timeoutMs);
+  try {
+    return await fetch(url, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+      signal: ctrl.signal,
+    });
+  } finally {
+    clearTimeout(t);
+  }
 }
 
 function hideOverlay() {
@@ -214,24 +231,24 @@ async function saveKey() {
     return;
   }
   $("save-key").disabled = true;
-  setStatus($("key-status"), "Checking your key with Anthropic...", "working");
+  setStatus($("key-status"), "", "");
+  showOverlay("Checking your key with Anthropic…", "just a moment");
   try {
-    const res = await fetch("/api/key", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ key }),
-    });
+    const res = await postJSON("/api/key", { key }, 30000);
     const data = await res.json();
     if (!res.ok) {
       if (data.needs_auth) { showPasswordPanel(data.error || "Please enter the password."); return; }
       throw new Error(data.error || "Couldn't validate the key.");
     }
     $("api-key").value = "";
-    setStatus($("key-status"), "", "");
     showSetupMain();
   } catch (err) {
-    setStatus($("key-status"), err.message, "error");
+    const msg = err.name === "AbortError"
+      ? "Timed out reaching the server — please try again."
+      : err.message;
+    setStatus($("key-status"), msg, "error");
   } finally {
+    hideOverlay();
     $("save-key").disabled = false;
   }
 }

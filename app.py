@@ -120,6 +120,8 @@ def set_key():
         return jsonify(error=str(e)), 400
     except anthropic.AuthenticationError:
         return jsonify(error="That key was rejected by Anthropic - check it and try again."), 400
+    except (anthropic.APITimeoutError, anthropic.APIConnectionError):
+        return jsonify(error="Couldn't reach Anthropic to check the key (timed out). Please try again."), 504
     except anthropic.APIError as e:
         return jsonify(error=f"Couldn't validate the key: {e.message}"), 502
     USER_KEYS[session["uid"]] = key

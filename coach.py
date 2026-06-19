@@ -17,14 +17,15 @@ def make_client(api_key: str) -> anthropic.Anthropic:
 def validate_key(api_key: str) -> None:
     """Check a user-entered key is usable.
 
-    Raises ValueError for an empty key, or anthropic.AuthenticationError if the
-    key is rejected by the API. The models endpoint is free and returns 401 on
-    a bad key - a cheap probe.
+    Raises ValueError for an empty key, anthropic.AuthenticationError if the key
+    is rejected, or anthropic.APITimeoutError / APIConnectionError if Anthropic
+    can't be reached. The models endpoint is free and returns 401 on a bad key -
+    a cheap probe. Short timeout + single retry so it fails fast, never hangs.
     """
     api_key = (api_key or "").strip()
     if not api_key:
         raise ValueError("Please enter a key.")
-    make_client(api_key).models.list(limit=1)
+    anthropic.Anthropic(api_key=api_key, timeout=15.0, max_retries=1).models.list(limit=1)
 
 
 # ---------------------------------------------------------------------------
