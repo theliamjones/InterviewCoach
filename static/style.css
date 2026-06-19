@@ -154,6 +154,7 @@ button.secondary:hover { border-color: var(--muted); }
   border-radius: 999px;
 }
 .question-card h2 { margin: 0.5rem 0 0.3rem; font-size: 1.25rem; }
+.fb-question { margin: 0.5rem 0 0; font-size: 1.15rem; font-weight: bold; }
 .why-asked { color: var(--muted); font-style: italic; margin: 0; font-size: 0.9rem; }
 
 .recorder { display: flex; align-items: center; gap: 1rem; }

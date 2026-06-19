@@ -377,6 +377,9 @@ function advance() {
 // ---------------------------------------------------------------------------
 
 function renderFeedback(fb) {
+  const q = state.questions[state.current];
+  $("fb-competency").textContent = q.competency;
+  $("fb-question").textContent = q.question;
   $("overall-score").textContent = fb.overall_score;
   $("depth-score").textContent = fb.depth_score;
 
