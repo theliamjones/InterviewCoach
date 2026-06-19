@@ -34,9 +34,14 @@ app.secret_key = os.environ.get("SECRET_KEY") or secrets.token_hex(32)
 app.config.update(
     SESSION_COOKIE_HTTPONLY=True,
     SESSION_COOKIE_SAMESITE="Lax",
-    # Secure cookies over HTTPS. Auto-on when Railway sets RAILWAY_ENVIRONMENT,
-    # or force with SECURE_COOKIES=1. Left off locally so plain http works.
-    SESSION_COOKIE_SECURE=bool(os.environ.get("RAILWAY_ENVIRONMENT") or os.environ.get("SECURE_COOKIES")),
+    # Secure cookies over HTTPS. Auto-on when any Railway marker is present
+    # (names vary), or force with SECURE_COOKIES=1. Left off locally for http.
+    SESSION_COOKIE_SECURE=bool(
+        os.environ.get("SECURE_COOKIES")
+        or os.environ.get("RAILWAY_ENVIRONMENT")
+        or os.environ.get("RAILWAY_ENVIRONMENT_NAME")
+        or os.environ.get("RAILWAY_PUBLIC_DOMAIN")
+    ),
 )
 
 # Shared password gate. If APP_PASSWORD is unset the gate is OPEN (handy for
