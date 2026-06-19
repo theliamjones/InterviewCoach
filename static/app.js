@@ -144,27 +144,66 @@ $("clear-answer").addEventListener("click", () => {
 // API key gate
 // ---------------------------------------------------------------------------
 
-function showKeyPanel(message) {
-  $("key-panel").classList.remove("hidden");
-  $("setup-main").classList.add("hidden");
+// Show exactly one of the three setup sub-states: password gate, key gate, or
+// the setup form itself.
+function showGate(which) {
+  $("password-panel").classList.toggle("hidden", which !== "password");
+  $("key-panel").classList.toggle("hidden", which !== "key");
+  $("setup-main").classList.toggle("hidden", which !== "setup");
   showStep("step-setup");
+  if (which === "password") $("app-password").focus();
+  if (which === "key") $("api-key").focus();
+}
+
+function showPasswordPanel(message) {
+  showGate("password");
+  if (message) setStatus($("password-status"), message, "error");
+}
+
+function showKeyPanel(message) {
+  showGate("key");
   if (message) setStatus($("key-status"), message, "error");
-  $("api-key").focus();
 }
 
 function showSetupMain() {
-  $("key-panel").classList.add("hidden");
-  $("setup-main").classList.remove("hidden");
+  showGate("setup");
 }
 
-async function checkKey() {
+// Decide which gate to show based on server state (password / key / ready).
+async function routeToGate() {
   try {
-    const res = await fetch("/api/key-status");
-    const data = await res.json();
-    data.has_key ? showSetupMain() : showKeyPanel("");
+    const s = await (await fetch("/api/status")).json();
+    if (s.gated && !s.authed) showPasswordPanel("");
+    else if (!s.has_key) showKeyPanel("");
+    else showSetupMain();
   } catch {
-    // If the status check fails, fall back to showing setup; calls will prompt if needed.
-    showSetupMain();
+    showSetupMain(); // if status fails, fall through; calls will re-prompt if needed
+  }
+}
+
+async function savePassword() {
+  const password = $("app-password").value;
+  if (!password) {
+    setStatus($("password-status"), "Please enter the password.", "error");
+    return;
+  }
+  $("save-password").disabled = true;
+  setStatus($("password-status"), "Checking…", "working");
+  try {
+    const res = await fetch("/api/login", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ password }),
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || "Incorrect password.");
+    $("app-password").value = "";
+    setStatus($("password-status"), "", "");
+    await routeToGate(); // proceed to the key gate or the setup form
+  } catch (err) {
+    setStatus($("password-status"), err.message, "error");
+  } finally {
+    $("save-password").disabled = false;
   }
 }
 
@@ -183,7 +222,10 @@ async function saveKey() {
       body: JSON.stringify({ key }),
     });
     const data = await res.json();
-    if (!res.ok) throw new Error(data.error || "Couldn't validate the key.");
+    if (!res.ok) {
+      if (data.needs_auth) { showPasswordPanel(data.error || "Please enter the password."); return; }
+      throw new Error(data.error || "Couldn't validate the key.");
+    }
     $("api-key").value = "";
     setStatus($("key-status"), "", "");
     showSetupMain();
@@ -194,12 +236,16 @@ async function saveKey() {
   }
 }
 
+$("save-password").addEventListener("click", savePassword);
+$("app-password").addEventListener("keydown", (e) => {
+  if (e.key === "Enter") { e.preventDefault(); savePassword(); }
+});
 $("save-key").addEventListener("click", saveKey);
 $("api-key").addEventListener("keydown", (e) => {
   if (e.key === "Enter") { e.preventDefault(); saveKey(); }
 });
 
-checkKey();
+routeToGate();
 
 // ---------------------------------------------------------------------------
 // Step 1: setup
@@ -217,6 +263,7 @@ $("setup-form").addEventListener("submit", async (e) => {
     const res = await fetch("/api/start", { method: "POST", body: formData });
     const data = await res.json();
     if (!res.ok) {
+      if (data.needs_auth) { showPasswordPanel(data.error || "Please enter the password."); return; }
       if (data.needs_key) { showKeyPanel(data.error || "Please enter your API key."); return; }
       throw new Error(data.error || "Something went wrong.");
     }
@@ -276,6 +323,7 @@ $("submit-answer").addEventListener("click", async () => {
     });
     const data = await res.json();
     if (!res.ok) {
+      if (data.needs_auth) { showPasswordPanel(data.error || "Please enter the password."); return; }
       if (data.needs_key) { showKeyPanel(data.error || "Please re-enter your API key."); return; }
       throw new Error(data.error || "Something went wrong.");
     }

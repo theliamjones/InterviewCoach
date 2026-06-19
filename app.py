@@ -1,29 +1,79 @@
-"""Interview Coach - practise competency-based interview answers with STAR feedback."""
+"""Interview Coach - practise competency-based interview answers with STAR feedback.
 
+Multi-user model: a shared password gate (APP_PASSWORD) protects the app, and each
+visitor supplies their own Claude API key, held in memory for their session only
+(keyed by a per-browser id in the signed session cookie - the key itself is never
+put in the cookie, and is never shared between users). So each user pays for their
+own usage and no key is persisted to disk.
+"""
+
+import hmac
 import os
+import secrets
 import uuid
 from datetime import date
 
 from dotenv import load_dotenv
 
-# Load .env from THIS file's directory, not the current working directory, so the
-# key is found however the app is launched (start.bat, terminal, preview, etc.).
-# override=True: .env is authoritative (a stale/empty ANTHROPIC_API_KEY in the
-# Windows environment would otherwise silently win over .env).
+# Load .env from THIS file's directory, not the current working directory, so
+# config is found however the app is launched (start.bat, terminal, gunicorn).
 load_dotenv(os.path.join(os.path.dirname(__file__), ".env"), override=True)
 
 import anthropic
-from flask import Flask, Response, jsonify, render_template, request
+from flask import Flask, Response, jsonify, render_template, request, session
 
 import coach
 
 app = Flask(__name__)
 app.config["MAX_CONTENT_LENGTH"] = 16 * 1024 * 1024  # 16 MB upload cap
 
-# In-memory session store: fine for a local single-user practice tool.
-SESSIONS: dict[str, dict] = {}
+# The session cookie holds only a random per-browser id + an "authed" flag -
+# never the API key. Signed with SECRET_KEY; set a fixed one in production to
+# keep logins valid across restarts, otherwise a random one is used per boot.
+app.secret_key = os.environ.get("SECRET_KEY") or secrets.token_hex(32)
+app.config.update(
+    SESSION_COOKIE_HTTPONLY=True,
+    SESSION_COOKIE_SAMESITE="Lax",
+    # Secure cookies over HTTPS. Auto-on when Railway sets RAILWAY_ENVIRONMENT,
+    # or force with SECURE_COOKIES=1. Left off locally so plain http works.
+    SESSION_COOKIE_SECURE=bool(os.environ.get("RAILWAY_ENVIRONMENT") or os.environ.get("SECURE_COOKIES")),
+)
+
+# Shared password gate. If APP_PASSWORD is unset the gate is OPEN (handy for
+# local dev) - you MUST set APP_PASSWORD on any shared/Railway deployment.
+APP_PASSWORD = os.environ.get("APP_PASSWORD", "")
+if not APP_PASSWORD:
+    app.logger.warning("APP_PASSWORD is not set - the app is OPEN (no password gate).")
+
+# In-memory stores keyed by the per-browser session id (uid). A single gunicorn
+# worker (see Procfile) keeps these consistent; both are cleared on restart.
+SESSIONS: dict[str, dict] = {}   # practice sessions: session_id -> {uid, ...}
+USER_KEYS: dict[str, str] = {}   # uid -> that user's Claude API key (memory only)
 
 ALLOWED_CV_EXTENSIONS = (".pdf", ".docx", ".txt")
+
+
+@app.before_request
+def ensure_uid():
+    if "uid" not in session:
+        session["uid"] = secrets.token_hex(16)
+
+
+def is_authed() -> bool:
+    return not APP_PASSWORD or session.get("authed") is True
+
+
+def current_key() -> str:
+    return USER_KEYS.get(session.get("uid", ""), "")
+
+
+def not_ready():
+    """Return an (json, status) error tuple if not authed / no key, else None."""
+    if not is_authed():
+        return jsonify(error="Please enter the access password.", needs_auth=True), 401
+    if not current_key():
+        return jsonify(error="Please enter your Claude API key.", needs_key=True), 401
+    return None
 
 
 @app.route("/")
@@ -31,29 +81,52 @@ def index():
     return render_template("index.html")
 
 
-@app.get("/api/key-status")
-def key_status():
-    """Tell the front end whether a usable API key is already configured."""
-    return jsonify(has_key=coach.has_key())
+@app.get("/api/status")
+def status():
+    """Tell the front end what gate to show: password, key, or the app itself."""
+    return jsonify(gated=bool(APP_PASSWORD), authed=is_authed(), has_key=bool(current_key()))
+
+
+@app.post("/api/login")
+def login():
+    password = (request.get_json(silent=True) or {}).get("password", "")
+    if not APP_PASSWORD or hmac.compare_digest(password, APP_PASSWORD):
+        session["authed"] = True
+        return jsonify(ok=True)
+    return jsonify(error="Incorrect password."), 401
+
+
+@app.post("/api/logout")
+def logout():
+    USER_KEYS.pop(session.get("uid", ""), None)
+    session.clear()
+    return jsonify(ok=True)
 
 
 @app.post("/api/key")
 def set_key():
-    """Accept an API key entered in the browser; validate and hold it in memory."""
-    data = request.get_json(silent=True) or {}
+    """Validate a user's key and hold it in memory for their session only."""
+    if not is_authed():
+        return jsonify(error="Please enter the access password.", needs_auth=True), 401
+    key = ((request.get_json(silent=True) or {}).get("key") or "").strip()
     try:
-        coach.set_runtime_key(data.get("key", ""))
+        coach.validate_key(key)
     except ValueError as e:
         return jsonify(error=str(e)), 400
     except anthropic.AuthenticationError:
         return jsonify(error="That key was rejected by Anthropic - check it and try again."), 400
     except anthropic.APIError as e:
         return jsonify(error=f"Couldn't validate the key: {e.message}"), 502
+    USER_KEYS[session["uid"]] = key
     return jsonify(ok=True)
 
 
 @app.post("/api/start")
 def start_session():
+    blocked = not_ready()
+    if blocked:
+        return blocked
+
     cv_file = request.files.get("cv")
     job_spec = (request.form.get("job_spec") or "").strip()
     try:
@@ -61,8 +134,6 @@ def start_session():
     except ValueError:
         num_questions = 6
 
-    if not coach.has_key():
-        return jsonify(error="No API key set - please enter your Claude API key.", needs_key=True), 401
     if len(job_spec) < 50:
         return jsonify(error="Please paste the job spec (at least a few sentences)."), 400
 
@@ -76,14 +147,16 @@ def start_session():
         cv_block = coach.build_cv_block(cv_file.filename, cv_file.read())
 
     try:
-        question_set = coach.generate_questions(cv_block, job_spec, num_questions)
+        question_set = coach.generate_questions(current_key(), cv_block, job_spec, num_questions)
     except anthropic.AuthenticationError:
+        USER_KEYS.pop(session["uid"], None)  # key went bad - make them re-enter
         return jsonify(error="Your API key was rejected - please re-enter it.", needs_key=True), 401
     except anthropic.APIError as e:
         return jsonify(error=f"Claude API error: {e.message}"), 502
 
     session_id = uuid.uuid4().hex
     SESSIONS[session_id] = {
+        "uid": session["uid"],
         "cv_block": cv_block,
         "job_spec": job_spec,
         "questions": [q.model_dump() for q in question_set.questions],
@@ -92,34 +165,42 @@ def start_session():
     return jsonify(session_id=session_id, questions=SESSIONS[session_id]["questions"])
 
 
+def _owned_session(session_id):
+    """Look up a practice session, but only if it belongs to this browser."""
+    sess = SESSIONS.get(session_id or "")
+    if sess and sess.get("uid") == session.get("uid"):
+        return sess
+    return None
+
+
 @app.post("/api/score")
 def score_answer():
+    blocked = not_ready()
+    if blocked:
+        return blocked
+
     data = request.get_json(silent=True) or {}
-    session = SESSIONS.get(data.get("session_id", ""))
+    sess = _owned_session(data.get("session_id"))
     transcript = (data.get("transcript") or "").strip()
     question_id = data.get("question_id")
 
-    if not session:
+    if not sess:
         return jsonify(error="Session not found - please start again."), 404
-    question = next((q for q in session["questions"] if q["id"] == question_id), None)
+    question = next((q for q in sess["questions"] if q["id"] == question_id), None)
     if not question:
         return jsonify(error="Unknown question."), 400
     if len(transcript) < 20:
         return jsonify(error="The answer is too short to score - try recording again."), 400
 
-    if not coach.has_key():
-        return jsonify(error="No API key set - please enter your Claude API key.", needs_key=True), 401
-
     try:
-        feedback = coach.score_answer(
-            session["cv_block"], session["job_spec"], question, transcript
-        )
+        feedback = coach.score_answer(current_key(), sess["cv_block"], sess["job_spec"], question, transcript)
     except anthropic.AuthenticationError:
+        USER_KEYS.pop(session["uid"], None)
         return jsonify(error="Your API key was rejected - please re-enter it.", needs_key=True), 401
     except anthropic.APIError as e:
         return jsonify(error=f"Claude API error: {e.message}"), 502
 
-    session["answers"][str(question_id)] = {
+    sess["answers"][str(question_id)] = {
         "transcript": transcript,
         "feedback": feedback.model_dump(),
     }
@@ -128,15 +209,18 @@ def score_answer():
 
 @app.post("/api/report")
 def download_report():
+    if not is_authed():
+        return jsonify(error="Please enter the access password.", needs_auth=True), 401
+
     data = request.get_json(silent=True) or {}
-    session = SESSIONS.get(data.get("session_id", ""))
-    if not session:
+    sess = _owned_session(data.get("session_id"))
+    if not sess:
         return jsonify(error="Session not found."), 404
 
     answered = [
-        {"question": q, **session["answers"][str(q["id"])]}
-        for q in session["questions"]
-        if str(q["id"]) in session["answers"]
+        {"question": q, **sess["answers"][str(q["id"])]}
+        for q in sess["questions"]
+        if str(q["id"]) in sess["answers"]
     ]
     if not answered:
         return jsonify(error="No answered questions to report on yet."), 400
@@ -147,7 +231,7 @@ def download_report():
         items=answered,
         report_date=date.today().strftime("%d %B %Y"),
         average_score=round(sum(scores) / len(scores)),
-        total_questions=len(session["questions"]),
+        total_questions=len(sess["questions"]),
     )
     return Response(
         html,

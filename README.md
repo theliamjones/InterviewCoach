@@ -6,9 +6,10 @@ Built for anyone going through the recruitment process: paste in a job spec (and
 CV), answer the questions by speaking, and get scored on how well-structured and detailed your
 answers are.
 
-> **You'll need your own Anthropic (Claude) API key** — it's free to create and pay-as-you-go, and
-> a practice session costs only a few pence. Get one at <https://console.anthropic.com>. The
-> author's key is **not** included (and isn't in this repo).
+> **Everyone uses their own Anthropic (Claude) API key.** It's free to create and pay-as-you-go,
+> and a practice session costs only a few pence. Get one at <https://console.anthropic.com>. You
+> paste your key into the app when you start; it's held **in memory for your session only** —
+> never written to disk, never shared between users, and not stored in this repo.
 
 ## How it works
 
@@ -33,23 +34,17 @@ answers are.
 - **Chrome or Edge** to use it (the voice transcription uses the browser's built-in Web Speech
   API, which Firefox doesn't support — there you can type answers instead)
 
-## Setup
+## Run it locally
 
 ```powershell
 git clone https://github.com/theliamjones/InterviewCoach.git
 cd InterviewCoach
 py -m pip install -r requirements.txt
 copy .env.example .env
-# then open .env and paste in your ANTHROPIC_API_KEY
+# open .env and set APP_PASSWORD (and optionally SECRET_KEY)
 ```
 
 (On macOS/Linux, use `python3` instead of `py` and `cp` instead of `copy`.)
-
-> **No `.env`? No problem.** If a key isn't found when you start the app, it'll ask you to
-> paste one in the browser. That key is kept in memory for that run only — never written to
-> disk — so it's handy for a quick try without editing files.
-
-## Run
 
 On Windows, just **double-click `start.bat`** — it launches the app and opens your browser
 automatically. Or from a terminal:
@@ -58,7 +53,33 @@ automatically. Or from a terminal:
 py app.py
 ```
 
-Then open <http://localhost:5050> in Chrome or Edge.
+Then open <http://localhost:5050> in Chrome or Edge. You'll be asked for the access password
+(`APP_PASSWORD`), then for your own Claude API key.
+
+> Leaving `APP_PASSWORD` unset runs the app with **no** password gate — fine for quick local
+> testing, but never do that on a shared deployment.
+
+## Deploy to Railway (shared, multi-user)
+
+The app is production-ready behind [gunicorn](https://gunicorn.org/) (see `Procfile`) and is
+safe to share: it sits behind a password, and **each visitor supplies their own Claude key**, so
+you never pay for anyone else's usage.
+
+1. On [Railway](https://railway.app), create a project from the GitHub repo
+   (`theliamjones/InterviewCoach`). Railway auto-detects Python and uses the `Procfile`.
+2. Add these service **Variables**:
+
+   | Variable        | Value                                              |
+   | --------------- | -------------------------------------------------- |
+   | `APP_PASSWORD`  | the shared password you give to people you invite  |
+   | `SECRET_KEY`    | a long random string (`python -c "import secrets; print(secrets.token_hex(32))"`) |
+
+3. Deploy, then open the generated URL. Visitors enter the password, then their own API key.
+
+Notes for the shared deployment:
+- The single gunicorn worker (in `Procfile`) keeps the in-memory sessions consistent.
+- No API keys are stored server-side beyond each user's live session (cleared on restart).
+- Secure cookies switch on automatically on Railway.
 
 ## Notes
 
@@ -69,9 +90,13 @@ Then open <http://localhost:5050> in Chrome or Edge.
 - Speech recognition quality depends on your microphone. The scoring is told it is judging an
   automatic transcript of speech, so minor mis-transcriptions and filler aren't penalised.
 
-## Configuration (.env)
+## Configuration (.env / environment variables)
 
-| Variable            | Required | Description                       |
-| ------------------- | -------- | --------------------------------- |
-| `ANTHROPIC_API_KEY` | yes      | Your Anthropic API key            |
-| `FLASK_PORT`        | no       | Port to serve on (default `5050`) |
+| Variable          | Required | Description                                                                 |
+| ----------------- | -------- | --------------------------------------------------------------------------- |
+| `APP_PASSWORD`    | shared deploys | Password visitors must enter. If unset, the app is **open** (no gate). |
+| `SECRET_KEY`      | recommended | Signs the session cookie. Fixed value keeps logins valid across restarts; random if unset. |
+| `SECURE_COOKIES`  | no       | Set to `1` to force HTTPS-only cookies (auto-enabled on Railway).           |
+| `PORT`            | no       | Port to serve on (Railway sets this; defaults to `5050` locally).           |
+
+There is no `ANTHROPIC_API_KEY` setting — each user enters their own key in the browser.

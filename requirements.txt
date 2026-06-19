@@ -3,3 +3,4 @@ anthropic>=0.92
 python-dotenv>=1.0
 pydantic>=2.0
 python-docx>=1.1
+gunicorn>=21.0

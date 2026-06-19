@@ -1,7 +1,6 @@
 """Claude API layer: tailored question generation and STAR-method answer scoring."""
 
 import base64
-import os
 from typing import Literal
 
 import anthropic
@@ -9,47 +8,23 @@ from pydantic import BaseModel, Field
 
 MODEL = "claude-opus-4-8"
 
-_client = None
-# A key entered through the web UI, kept in memory for this run only (never
-# written to disk). Takes priority over the .env / environment key.
-_runtime_key: str | None = None
+
+def make_client(api_key: str) -> anthropic.Anthropic:
+    """Build a client for a specific user's key (no shared global client)."""
+    return anthropic.Anthropic(api_key=api_key)
 
 
-def resolve_key() -> str:
-    """The API key to use: a key entered this session wins over .env / environment."""
-    return (_runtime_key or os.environ.get("ANTHROPIC_API_KEY") or "").strip()
-
-
-def has_key() -> bool:
-    """Whether any non-empty key is currently configured."""
-    return bool(resolve_key())
-
-
-def get_client() -> anthropic.Anthropic:
-    global _client
-    key = resolve_key()
-    if not key:
-        raise RuntimeError("No Anthropic API key configured.")
-    if _client is None:
-        _client = anthropic.Anthropic(api_key=key)
-    return _client
-
-
-def set_runtime_key(key: str) -> None:
-    """Validate a user-entered key and, if good, use it for the rest of this run.
+def validate_key(api_key: str) -> None:
+    """Check a user-entered key is usable.
 
     Raises ValueError for an empty key, or anthropic.AuthenticationError if the
-    key is rejected by the API.
+    key is rejected by the API. The models endpoint is free and returns 401 on
+    a bad key - a cheap probe.
     """
-    global _runtime_key, _client
-    key = (key or "").strip()
-    if not key:
+    api_key = (api_key or "").strip()
+    if not api_key:
         raise ValueError("Please enter a key.")
-    # The models endpoint is free and returns 401 on a bad key - a cheap probe.
-    probe = anthropic.Anthropic(api_key=key)
-    probe.models.list(limit=1)
-    _runtime_key = key
-    _client = probe
+    make_client(api_key).models.list(limit=1)
 
 
 # ---------------------------------------------------------------------------
@@ -173,8 +148,8 @@ def _user_content(cv_block: dict | None, text: str) -> list[dict]:
     return blocks
 
 
-def generate_questions(cv_block: dict | None, job_spec: str, num_questions: int) -> QuestionSet:
-    client = get_client()
+def generate_questions(api_key: str, cv_block: dict | None, job_spec: str, num_questions: int) -> QuestionSet:
+    client = make_client(api_key)
     text = (
         f"JOB SPEC:\n{job_spec}\n\n"
         + ("" if cv_block else "No CV was provided - work from the job spec alone.\n\n")
@@ -225,8 +200,8 @@ provided, focus on the generic gaps and what the question was really probing for
 Be honest but constructive: the goal is that the candidate scores higher next time."""
 
 
-def score_answer(cv_block: dict | None, job_spec: str, question: dict, transcript: str) -> Feedback:
-    client = get_client()
+def score_answer(api_key: str, cv_block: dict | None, job_spec: str, question: dict, transcript: str) -> Feedback:
+    client = make_client(api_key)
     text = (
         f"JOB SPEC:\n{job_spec}\n\n"
         + ("" if cv_block else "No CV was provided.\n\n")

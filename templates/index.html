@@ -15,6 +15,17 @@
   <main>
     <!-- STEP 1: Setup -->
     <section id="step-setup" class="step">
+      <!-- Password gate: shown first when the app is password-protected -->
+      <div id="password-panel" class="key-panel hidden">
+        <h2>&#128274; Enter the access password</h2>
+        <p>This practice tool is password-protected. Enter the password you were given to continue.</p>
+        <div class="key-row">
+          <input type="password" id="app-password" placeholder="Password" autocomplete="off">
+          <button id="save-password" class="primary">Continue</button>
+        </div>
+        <div id="password-status" class="status hidden"></div>
+      </div>
+
       <!-- Key gate: shown only when no usable API key is configured -->
       <div id="key-panel" class="key-panel hidden">
         <h2>&#128273; Enter your Claude API key</h2>
