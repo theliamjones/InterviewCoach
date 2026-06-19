@@ -211,6 +211,17 @@ sup { font-size: 0.7rem; color: var(--muted); }
   font-style: italic;
 }
 
+.clarify-box {
+  margin-top: 1.4rem;
+  border: 1px dashed var(--border);
+  border-radius: 8px;
+  padding: 0.9rem 1.1rem;
+  background: #fcfbf8;
+}
+.clarify-box h3 { margin-top: 0; }
+.clarify-box textarea { width: 100%; }
+.clarify-box button { margin-top: 0.6rem; }
+
 /* Summary step */
 .results-list { list-style: none; padding: 0; }
 .results-list li {

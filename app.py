@@ -214,6 +214,43 @@ def score_answer():
     return jsonify(feedback.model_dump())
 
 
+@app.post("/api/rescore")
+def rescore_answer():
+    """Re-score an already-answered question, applying a transcript clarification."""
+    blocked = not_ready()
+    if blocked:
+        return blocked
+
+    data = request.get_json(silent=True) or {}
+    sess = _owned_session(data.get("session_id"))
+    question_id = data.get("question_id")
+    clarification = (data.get("clarification") or "").strip()
+
+    if not sess:
+        return jsonify(error="Session not found - please start again."), 404
+    answer = sess["answers"].get(str(question_id))
+    question = next((q for q in sess["questions"] if q["id"] == question_id), None)
+    if not answer or not question:
+        return jsonify(error="That answer hasn't been scored yet."), 400
+    if len(clarification) < 3:
+        return jsonify(error="Add a short clarification of what was mis-heard, then re-evaluate."), 400
+
+    try:
+        feedback = coach.score_answer(
+            current_key(), sess["cv_block"], sess["job_spec"], question,
+            answer["transcript"], clarification=clarification
+        )
+    except anthropic.AuthenticationError:
+        USER_KEYS.pop(session["uid"], None)
+        return jsonify(error="Your API key was rejected - please re-enter it.", needs_key=True), 401
+    except anthropic.APIError as e:
+        return jsonify(error=f"Claude API error: {e.message}"), 502
+
+    answer["feedback"] = feedback.model_dump()
+    answer["clarification"] = clarification
+    return jsonify(feedback.model_dump())
+
+
 @app.post("/api/report")
 def download_report():
     if not is_authed():

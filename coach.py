@@ -201,7 +201,8 @@ provided, focus on the generic gaps and what the question was really probing for
 Be honest but constructive: the goal is that the candidate scores higher next time."""
 
 
-def score_answer(api_key: str, cv_block: dict | None, job_spec: str, question: dict, transcript: str) -> Feedback:
+def score_answer(api_key: str, cv_block: dict | None, job_spec: str, question: dict,
+                 transcript: str, clarification: str = "") -> Feedback:
     client = make_client(api_key)
     text = (
         f"JOB SPEC:\n{job_spec}\n\n"
@@ -210,6 +211,18 @@ def score_answer(api_key: str, cv_block: dict | None, job_spec: str, question: d
         f"QUESTION ASKED: {question['question']}\n\n"
         f"CANDIDATE'S SPOKEN ANSWER (auto-transcribed):\n{transcript}"
     )
+    if clarification.strip():
+        text += (
+            "\n\nCANDIDATE'S CLARIFICATION OF THE TRANSCRIPT:\n"
+            "The transcript above came from speech-to-text and mis-heard some things. The "
+            "candidate has clarified the points below — typically correcting domain terms or "
+            "acronyms that were transcribed wrongly. Treat these as corrections to what they "
+            "ACTUALLY said, apply them to the answer, and re-evaluate fairly as if those words "
+            "had been transcribed correctly. Do not penalise the original mis-transcription. "
+            "Only credit substance the candidate genuinely conveyed (corrected wording counts; "
+            "brand-new claims that go beyond what was said should not materially inflate the "
+            f"score).\n\nClarification:\n{clarification.strip()}"
+        )
     response = client.messages.parse(
         model=MODEL,
         max_tokens=16000,

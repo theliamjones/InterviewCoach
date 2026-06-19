@@ -125,6 +125,17 @@
       <div class="coded-answer" id="coded-answer"></div>
       <ol class="seg-notes" id="seg-notes"></ol>
 
+      <div class="clarify-box">
+        <h3>Mis-heard something? Clarify and re-evaluate</h3>
+        <p class="hint">Voice-to-text can mangle domain terms and acronyms. Note what you actually
+          meant and Claude will re-score, treating it as a correction &mdash; e.g.
+          <em>"when I said 'ISO XML' I meant 'ISO 20022 MX'"</em>.</p>
+        <textarea id="clarification" rows="3"
+          placeholder="e.g. 'data warehouse' was heard as 'data warehoue'; when I said 'ISO XML' I meant 'ISO 20022 MX'"></textarea>
+        <button id="reevaluate" class="secondary">Re-evaluate with this clarification</button>
+        <div id="reevaluate-status" class="status hidden"></div>
+      </div>
+
       <div class="feedback-cols">
         <div>
           <h3>What you missed</h3>

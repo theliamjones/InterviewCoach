@@ -36,6 +36,8 @@
   li { margin-bottom: 0.3rem; }
   .summary { border-left: 4px solid #1f6f5c; padding: 0.5rem 0.9rem; background: #f2f6f4;
              font-style: italic; margin-top: 1rem; }
+  .clarification { font-size: 0.88rem; color: #555; background: #f2f6f4; border-radius: 6px;
+                   padding: 0.5rem 0.8rem; margin-top: 0.8rem; }
   footer { margin-top: 3rem; color: #999; font-size: 0.8rem; text-align: center; }
   @media print { body { padding: 0; } }
 </style>
@@ -84,6 +86,10 @@
     <li>{{ seg.comment }}</li>
     {% endfor %}
   </ol>
+  {% endif %}
+
+  {% if item.clarification %}
+  <p class="clarification"><strong>Clarification applied (re-evaluated):</strong> {{ item.clarification }}</p>
   {% endif %}
 
   {% if fb.missed_points %}

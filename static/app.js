@@ -313,6 +313,9 @@ function showQuestion() {
   $("record-status").textContent = "";
   updateClearButton();
   setStatus($("score-status"), "", "");
+  // Reset the per-question clarification box for the upcoming feedback
+  $("clarification").value = "";
+  setStatus($("reevaluate-status"), "", "");
   showStep("step-interview");
 }
 
@@ -417,6 +420,44 @@ function renderFeedback(fb) {
 }
 
 $("next-question").addEventListener("click", advance);
+
+// Re-evaluate the current question with a transcript clarification
+$("reevaluate").addEventListener("click", async () => {
+  const clarification = $("clarification").value.trim();
+  if (clarification.length < 3) {
+    setStatus($("reevaluate-status"), "Add a short note on what was mis-heard first.", "error");
+    return;
+  }
+  $("reevaluate").disabled = true;
+  setStatus($("reevaluate-status"), "", "");
+  showOverlay("Re-evaluating with your clarification…");
+  try {
+    const res = await postJSON("/api/rescore", {
+      session_id: state.sessionId,
+      question_id: state.questions[state.current].id,
+      clarification,
+    }, 120000);
+    const data = await res.json();
+    if (!res.ok) {
+      if (data.needs_auth) { showPasswordPanel(data.error || "Please enter the password."); return; }
+      if (data.needs_key) { showKeyPanel(data.error || "Please re-enter your API key."); return; }
+      throw new Error(data.error || "Something went wrong.");
+    }
+    // Update the stored result for this question so the summary/report use the new score
+    const entry = state.results.find((r) => r.question.id === state.questions[state.current].id);
+    if (entry) { entry.feedback = data; entry.clarification = clarification; }
+    renderFeedback(data);
+    setStatus($("reevaluate-status"), "Re-evaluated with your clarification.", "working");
+  } catch (err) {
+    const msg = err.name === "AbortError"
+      ? "Timed out — please try again."
+      : err.message;
+    setStatus($("reevaluate-status"), msg, "error");
+  } finally {
+    hideOverlay();
+    $("reevaluate").disabled = false;
+  }
+});
 
 // ---------------------------------------------------------------------------
 // Step 4: summary + report download
